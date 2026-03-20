@@ -53,7 +53,7 @@ Note: Spring Boot 2.x reaches end-of-life soon, so upgrading Java is recommended
 
 ## Building the Project
 
-This project includes custom Gradle tasks and a Makefile for easy command execution.
+This project includes custom Gradle tasks and task runners for easy command execution.
 
 ### Quick Start (Using Makefile)
 ```bash
@@ -74,6 +74,34 @@ make full-build
 
 # Run the application
 make run
+```
+
+### Windows (CMD / PowerShell)
+
+On Windows, use `tasks.bat` (Command Prompt) or `.\tasks.ps1` (PowerShell) instead of `make`:
+
+**Command Prompt:**
+```cmd
+tasks.bat help         # Show all available commands
+tasks.bat build        # Build the project
+tasks.bat coverage     # Run tests with coverage report
+tasks.bat quality      # Run quality checks
+tasks.bat full-build   # Complete build with all checks
+tasks.bat run          # Run the application
+tasks.bat test         # Run tests
+tasks.bat clean        # Clean build artifacts
+tasks.bat jar          # Build executable JAR
+tasks.bat verify       # Run build with all verifications
+```
+
+**PowerShell:**
+```powershell
+.\tasks.ps1 help
+.\tasks.ps1 build
+.\tasks.ps1 coverage
+.\tasks.ps1 quality
+.\tasks.ps1 full-build
+.\tasks.ps1 run
 ```
 
 ### Gradle Tasks
@@ -152,7 +180,7 @@ The application uses Spring profiles for environment-specific configuration:
 - ✅ SpotBugs (bug detection)
 - ✅ JaCoCo (code coverage with 80% threshold)
 - ✅ Custom Gradle tasks for common operations
-- ✅ Makefile for Python/Make-style workflow
+- ✅ Makefile for Unix/Mac workflow; `tasks.bat` / `tasks.ps1` for Windows
 
 ### Coming Next
 - ⏳ Testing framework extensions (Mockito, AssertJ, REST Assured)
@@ -187,6 +215,12 @@ make quality
 make coverage
 # or
 ./gradlew testWithCoverage
+```
+
+**Windows:**
+```cmd
+tasks.bat quality
+tasks.bat coverage
 ```
 
 ### View Reports
