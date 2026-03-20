@@ -98,8 +98,17 @@ tasks.test {
     finalizedBy(tasks.jacocoTestReport)
 }
 
+val jacocoExclusions = listOf(
+    "**/Application.class"
+)
+
 tasks.jacocoTestReport {
     dependsOn(tasks.test)
+    classDirectories.setFrom(
+        files(classDirectories.files.map {
+            fileTree(it) { exclude(jacocoExclusions) }
+        })
+    )
     reports {
         xml.required.set(true)
         html.required.set(true)
@@ -109,6 +118,11 @@ tasks.jacocoTestReport {
 
 tasks.register<JacocoCoverageVerification>("jacocoVerify") {
     dependsOn(tasks.jacocoTestReport)
+    classDirectories.setFrom(
+        files(classDirectories.files.map {
+            fileTree(it) { exclude(jacocoExclusions) }
+        })
+    )
     violationRules {
         rule {
             limit {
@@ -136,8 +150,111 @@ tasks.register("testWithCoverage") {
     description = "Runs tests and generates coverage report"
     dependsOn(tasks.test, tasks.jacocoTestReport)
     doLast {
-        println("\n✅ Tests completed!")
-        println("📊 Coverage report: ${layout.buildDirectory.get()}/reports/jacoco/test/html/index.html")
+        val xmlReport = file("${layout.buildDirectory.get()}/reports/jacoco/test/jacocoTestReport.xml")
+        if (xmlReport.exists()) {
+            val factory = javax.xml.parsers.DocumentBuilderFactory.newInstance().apply {
+                setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+                setFeature("http://xml.org/sax/features/validation", false)
+            }
+            val doc = factory.newDocumentBuilder().parse(xmlReport)
+
+            val reset  = "\u001B[0m"
+            val bold   = "\u001B[1m"
+            val cyan   = "\u001B[36m"
+            val green  = "\u001B[32m"
+            val yellow = "\u001B[33m"
+            val red    = "\u001B[31m"
+            fun pctColor(pct: Double) = when {
+                pct >= 80.0 -> green
+                pct >= 60.0 -> yellow
+                else        -> red
+            }
+
+            // Per-class coverage
+            println("\n${bold}${cyan}Class Coverage (Lines):$reset")
+            println(cyan + "-".repeat(60) + reset)
+            println("${bold}%-40s %8s %8s %8s$reset".format("Class", "Covered", "Total", "Ratio"))
+            println(cyan + "-".repeat(60) + reset)
+            var totalCovered = 0; var totalLines = 0
+            val classes = doc.getElementsByTagName("class")
+            for (i in 0 until classes.length) {
+                val cls = classes.item(i)
+                val className = cls.attributes.getNamedItem("name").nodeValue.substringAfterLast("/")
+                val sourcefileName = cls.attributes.getNamedItem("sourcefilename")?.nodeValue
+
+                // Collect missed line numbers from the sibling <sourcefile> element
+                val missedLines = mutableListOf<Int>()
+                if (sourcefileName != null) {
+                    val siblings = cls.parentNode.childNodes
+                    for (j in 0 until siblings.length) {
+                        val sibling = siblings.item(j)
+                        if (sibling.nodeName == "sourcefile" &&
+                            sibling.attributes.getNamedItem("name")?.nodeValue == sourcefileName) {
+                            val lines = sibling.childNodes
+                            for (k in 0 until lines.length) {
+                                val line = lines.item(k)
+                                if (line.nodeName == "line") {
+                                    val mi = line.attributes.getNamedItem("mi")?.nodeValue?.toInt() ?: 0
+                                    val mb = line.attributes.getNamedItem("mb")?.nodeValue?.toInt() ?: 0
+                                    if (mi > 0 || mb > 0) {
+                                        missedLines.add(line.attributes.getNamedItem("nr").nodeValue.toInt())
+                                    }
+                                }
+                            }
+                            break
+                        }
+                    }
+                }
+
+                val children = cls.childNodes
+                for (j in 0 until children.length) {
+                    val child = children.item(j)
+                    if (child.nodeName == "counter" &&
+                        child.attributes.getNamedItem("type").nodeValue == "LINE") {
+                        val missed = child.attributes.getNamedItem("missed").nodeValue.toInt()
+                        val covered = child.attributes.getNamedItem("covered").nodeValue.toInt()
+                        val total = missed + covered
+                        val pct = if (total > 0) covered * 100.0 / total else 0.0
+                        val ranges = mutableListOf<String>()
+                        var rangeStart = -1; var rangeEnd = -1
+                        for (line in missedLines.sorted()) {
+                            if (rangeStart == -1) { rangeStart = line; rangeEnd = line }
+                            else if (line == rangeEnd + 1) rangeEnd = line
+                            else { ranges.add(if (rangeStart == rangeEnd) "$rangeStart" else "$rangeStart-$rangeEnd"); rangeStart = line; rangeEnd = line }
+                        }
+                        if (rangeStart != -1) ranges.add(if (rangeStart == rangeEnd) "$rangeStart" else "$rangeStart-$rangeEnd")
+                        val missedStr = if (ranges.isNotEmpty()) "  ${red}(missed lines: ${ranges.joinToString(", ")})$reset" else ""
+                        totalCovered += covered; totalLines += total
+                        val color = pctColor(pct)
+                        println("%-40s %8d %8d $color%7.1f%%%s$reset".format(className, covered, total, pct, missedStr))
+                    }
+                }
+            }
+            println(cyan + "-".repeat(60) + reset)
+            val totalPct = if (totalLines > 0) totalCovered * 100.0 / totalLines else 0.0
+            println("${bold}%-40s %8d %8d ${pctColor(totalPct)}%7.1f%%%s".format("TOTAL", totalCovered, totalLines, totalPct, reset))
+
+            // Overall summary
+            println("\n${bold}${cyan}Overall Summary:$reset")
+            println(cyan + "-".repeat(45) + reset)
+            println("${bold}%-15s %10s %10s %8s$reset".format("Type", "Covered", "Total", "Ratio"))
+            println(cyan + "-".repeat(45) + reset)
+            val counters = doc.getElementsByTagName("counter")
+            for (i in 0 until counters.length) {
+                val counter = counters.item(i)
+                if (counter.parentNode.nodeName == "report") {
+                    val type = counter.attributes.getNamedItem("type").nodeValue
+                    val missed = counter.attributes.getNamedItem("missed").nodeValue.toInt()
+                    val covered = counter.attributes.getNamedItem("covered").nodeValue.toInt()
+                    val total = missed + covered
+                    val pct = if (total > 0) covered * 100.0 / total else 0.0
+                    val color = pctColor(pct)
+                    println("%-15s %10d %10d $color%7.1f%%%s".format(type, covered, total, pct, reset))
+                }
+            }
+            println(cyan + "-".repeat(45) + reset)
+        }
+        println("\nFull report: ${layout.buildDirectory.get()}/reports/jacoco/test/html/index.html")
     }
 }
 
@@ -146,7 +263,7 @@ tasks.register("qualityCheck") {
     description = "Runs all quality checks (Checkstyle, PMD, SpotBugs)"
     dependsOn(tasks.checkstyleMain, tasks.checkstyleTest, tasks.pmdMain, tasks.pmdTest, tasks.spotbugsMain, tasks.spotbugsTest)
     doLast {
-        println("\n✅ All quality checks passed!")
+        println("\nAll quality checks passed!")
     }
 }
 
@@ -155,10 +272,10 @@ tasks.register("fullBuild") {
     description = "Clean, build, test with coverage, and run all quality checks"
     dependsOn(tasks.clean, tasks.build)
     doLast {
-        println("\n🎉 Full build completed successfully!")
-        println("📦 Artifact: ${layout.buildDirectory.get()}/libs/${project.name}.jar")
-        println("📊 Coverage: ${layout.buildDirectory.get()}/reports/jacoco/test/html/index.html")
-        println("🔍 Quality Reports:")
+        println("\n Full build completed successfully!")
+        println(" Artifact: ${layout.buildDirectory.get()}/libs/${project.name}.jar")
+        println(" Coverage: ${layout.buildDirectory.get()}/reports/jacoco/test/html/index.html")
+        println(" Quality Reports:")
         println("   - Checkstyle: ${layout.buildDirectory.get()}/reports/checkstyle/")
         println("   - PMD: ${layout.buildDirectory.get()}/reports/pmd/")
         println("   - SpotBugs: ${layout.buildDirectory.get()}/reports/spotbugs/")
@@ -173,7 +290,7 @@ tasks.register("reports") {
             "${layout.buildDirectory.get()}/reports/jacoco/test/html/index.html",
             "${layout.buildDirectory.get()}/reports/tests/test/index.html"
         )
-        println("\n📊 Generated reports:")
+        println("\n Generated reports:")
         reports.forEach { println("   - $it") }
     }
 }
