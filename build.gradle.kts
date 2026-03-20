@@ -2,16 +2,19 @@ import org.springframework.boot.gradle.tasks.bundling.BootJar
 
 plugins {
     java
-    id("org.springframework.boot") version "3.3.5"
-    id("io.spring.dependency-management") version "1.1.6"
+    id("org.springframework.boot") version "3.5.12"
+    id("io.spring.dependency-management") version "1.1.7"
     checkstyle
     pmd
-    id("com.github.spotbugs") version "6.0.26"
+    id("com.github.spotbugs") version "6.4.8"
     jacoco
 }
 
 group = "com.template"
 version = "0.0.1-SNAPSHOT"
+
+// Override Spring BOM's commons-lang3 downgrade (required by SpotBugs/BCEL)
+ext["commons-lang3.version"] = "3.+"
 
 java {
     toolchain {
@@ -54,7 +57,7 @@ tasks.named<BootJar>("bootJar") {
 
 // Checkstyle Configuration
 checkstyle {
-    toolVersion = "10.20.2"
+    toolVersion = "13.+"
     configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
     isIgnoreFailures = false
     maxWarnings = 0
@@ -62,7 +65,7 @@ checkstyle {
 
 // PMD Configuration
 pmd {
-    toolVersion = "7.8.0"
+    toolVersion = "7.+"
     isConsoleOutput = true
     ruleSetFiles = files("${rootDir}/config/pmd/ruleset.xml")
     ruleSets = listOf() // Clear default rulesets
@@ -71,7 +74,7 @@ pmd {
 
 // SpotBugs Configuration
 spotbugs {
-    toolVersion = "4.8.6"
+    toolVersion = "4.9.8"
     effort = com.github.spotbugs.snom.Effort.MAX
     reportLevel = com.github.spotbugs.snom.Confidence.LOW
     ignoreFailures = false
@@ -91,7 +94,7 @@ tasks.withType<com.github.spotbugs.snom.SpotBugsTask>().configureEach {
 
 // JaCoCo Configuration
 jacoco {
-    toolVersion = "0.8.12"
+    toolVersion = "0.8.14"
 }
 
 tasks.test {
