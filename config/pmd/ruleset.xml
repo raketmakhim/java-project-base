@@ -11,8 +11,6 @@
 
     <!-- Best Practices -->
     <rule ref="category/java/bestpractices.xml">
-        <exclude name="JUnitTestContainsTooManyAsserts"/>
-        <exclude name="JUnitAssertionsShouldIncludeMessage"/>
         <exclude name="GuardLogStatement"/>
     </rule>
 
@@ -20,7 +18,6 @@
     <rule ref="category/java/codestyle.xml">
         <exclude name="AtLeastOneConstructor"/>
         <exclude name="CommentDefaultAccessModifier"/>
-        <exclude name="DefaultPackage"/>
         <exclude name="OnlyOneReturn"/>
         <exclude name="CallSuperInConstructor"/>
         <exclude name="LocalVariableCouldBeFinal"/>
@@ -55,6 +52,7 @@
         <exclude name="LoosePackageCoupling"/>
         <exclude name="DataClass"/>
         <exclude name="UseUtilityClass"/>
+        <exclude name="ExcessiveImports"/>
     </rule>
 
     <rule ref="category/java/design.xml/TooManyMethods">
@@ -77,8 +75,6 @@
 
     <!-- Error Prone -->
     <rule ref="category/java/errorprone.xml">
-        <exclude name="BeanMembersShouldSerialize"/>
-        <exclude name="DataflowAnomalyAnalysis"/>
         <exclude name="NullAssignment"/>
     </rule>
 
